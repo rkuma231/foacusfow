@@ -217,7 +217,7 @@
     <span id="userEmail"></span>
     <span class="sync-dot synced" id="syncDot" title="Synced to cloud"></span>
   </div>
-  <button class="btn-signout" onclick="doSignOut()">SIGN OUT</button>
+  <button class="btn-signout" id="signOutBtn">SIGN OUT</button>
 </div>
 
 <div class="app" id="appMain">
@@ -654,6 +654,7 @@ function updatePhaseDots() {
 
 // Init
 updatePhaseDots(); updateTimerDisplay(); updateRing();
+document.getElementById('signOutBtn').addEventListener('click', doSignOut);
 </script>
 </body>
 </html>
