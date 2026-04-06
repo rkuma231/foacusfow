@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FocusFlow — Deep Work Command Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --surface: #111115;
+    --surface2: #18181f;
+    --surface3: #1f1f28;
+    --border: #2a2a35;
+    --amber: #f59e0b;
+    --amber-dim: #92600a;
+    --amber-glow: rgba(245,158,11,0.15);
+    --red: #ef4444;
+    --green: #22c55e;
+    --text: #e8e8f0;
+    --text-dim: #5a5a6e;
+    --font-display: 'Syne', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-display);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(245,158,11,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(245,158,11,0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; display: grid; grid-template-columns: 340px 1fr; min-height: 100vh; }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow: hidden;
+  }
+
+  .logo { padding: 24px 24px 20px; border-bottom: 1px solid var(--border); }
+  .logo-mark { font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: -0.5px; color: var(--amber); }
+  .logo-sub { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+
+  .stats-strip { display: grid; grid-template-columns: 1fr 1fr 1fr; border-bottom: 1px solid var(--border); }
+  .stat-cell { padding: 14px 16px; border-right: 1px solid var(--border); }
+  .stat-cell:last-child { border-right: none; }
+  .stat-val { font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--amber); }
+  .stat-lbl { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-dim); margin-top: 2px; }
+
+  .add-task-zone { padding: 16px; border-bottom: 1px solid var(--border); }
+  .add-task-row { display: flex; gap: 8px; }
+  .task-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: var(--font-display); font-size: 13px; padding: 9px 12px; outline: none; transition: border-color .2s; }
+  .task-input:focus { border-color: var(--amber); }
+  .task-input::placeholder { color: var(--text-dim); }
+  .btn-add { background: var(--amber); color: #0a0a0c; border: none; font-family: var(--font-display); font-weight: 700; font-size: 13px; padding: 9px 16px; cursor: pointer; transition: opacity .15s; }
+  .btn-add:hover { opacity: 0.85; }
+
+  .task-list { flex: 1; overflow-y: auto; padding: 12px; }
+  .task-list::-webkit-scrollbar { width: 4px; }
+  .task-list::-webkit-scrollbar-track { background: transparent; }
+  .task-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .task-item { background: var(--surface2); border: 1px solid var(--border); margin-bottom: 8px; cursor: pointer; transition: border-color .2s, background .2s; position: relative; overflow: hidden; }
+  .task-item::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--border); transition: background .2s; }
+  .task-item:hover { border-color: var(--amber-dim); background: var(--surface3); }
+  .task-item:hover::before { background: var(--amber-dim); }
+  .task-item.active { border-color: var(--amber); background: var(--surface3); }
+  .task-item.active::before { background: var(--amber); }
+  .task-item.done { opacity: 0.5; }
+  .task-item.done .task-name { text-decoration: line-through; }
+
+  .task-header { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+  .task-check { width: 16px; height: 16px; border: 1.5px solid var(--border); background: transparent; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: border-color .2s, background .2s; }
+  .task-check:hover { border-color: var(--green); }
+  .task-check.checked { border-color: var(--green); background: var(--green); }
+  .task-check.checked::after { content: '✓'; color: #000; font-size: 10px; font-weight: 700; }
+  .task-name { flex: 1; font-size: 13px; font-weight: 600; line-height: 1.3; }
+  .task-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .sessions-badge { font-family: var(--font-mono); font-size: 10px; color: var(--amber); background: var(--amber-glow); border: 1px solid var(--amber-dim); padding: 2px 6px; white-space: nowrap; }
+  .btn-focus-mini { background: transparent; border: 1px solid var(--border); color: var(--text-dim); font-size: 10px; padding: 3px 7px; cursor: pointer; font-family: var(--font-mono); transition: all .15s; }
+  .btn-focus-mini:hover { border-color: var(--amber); color: var(--amber); }
+  .expand-btn { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 10px; padding: 0 6px; transition: color .15s; }
+  .expand-btn:hover { color: var(--text); }
+
+  .subtask-list { padding: 0 12px 10px 36px; display: none; }
+  .subtask-list.open { display: block; }
+  .subtask-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-top: 1px solid var(--border); }
+  .subtask-row .task-check { width: 13px; height: 13px; }
+  .subtask-name { font-size: 12px; color: #a0a0b8; flex: 1; }
+  .subtask-name.done { text-decoration: line-through; opacity: .5; }
+  .add-subtask-row { display: flex; gap: 6px; margin-top: 6px; }
+  .subtask-input { flex: 1; background: transparent; border: none; border-bottom: 1px solid var(--border); color: var(--text); font-family: var(--font-display); font-size: 12px; padding: 4px 0; outline: none; }
+  .subtask-input::placeholder { color: var(--text-dim); }
+  .btn-subtask-add { background: transparent; border: none; color: var(--amber); font-size: 16px; cursor: pointer; line-height: 1; }
+
+  /* MAIN */
+  .main { display: flex; flex-direction: column; }
+
+  .timer-section { padding: 40px 48px 36px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, rgba(245,158,11,0.04) 0%, transparent 100%); }
+  .active-task-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
+  .active-task-name { font-size: 26px; font-weight: 800; color: var(--text); margin-bottom: 28px; min-height: 36px; letter-spacing: -0.5px; }
+  .active-task-name .placeholder { color: var(--text-dim); font-weight: 400; font-size: 20px; }
+
+  .timer-ring-area { display: flex; align-items: center; gap: 48px; }
+  .timer-ring-wrap { position: relative; width: 180px; height: 180px; flex-shrink: 0; }
+  .ring-svg { width: 180px; height: 180px; transform: rotate(-90deg); }
+  .ring-bg { fill: none; stroke: var(--surface3); stroke-width: 6; }
+  .ring-progress { fill: none; stroke: var(--amber); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 502; stroke-dashoffset: 0; transition: stroke-dashoffset 1s linear, stroke .3s; filter: drop-shadow(0 0 8px var(--amber)); }
+  .ring-progress.break { stroke: var(--green); filter: drop-shadow(0 0 8px var(--green)); }
+  .timer-display { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .timer-time { font-family: var(--font-mono); font-size: 32px; font-weight: 700; color: var(--amber); letter-spacing: -1px; line-height: 1; }
+  .timer-time.break { color: var(--green); }
+  .timer-mode { font-family: var(--font-mono); font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); margin-top: 4px; }
+
+  .timer-controls { display: flex; flex-direction: column; gap: 16px; }
+  .timer-btn-row { display: flex; gap: 10px; align-items: center; }
+  .btn-primary { background: var(--amber); color: #0a0a0c; border: none; font-family: var(--font-display); font-weight: 700; font-size: 14px; padding: 12px 28px; cursor: pointer; letter-spacing: 0.5px; transition: opacity .15s, transform .1s; }
+  .btn-primary:hover { opacity: 0.88; }
+  .btn-primary:active { transform: scale(0.97); }
+  .btn-secondary { background: transparent; color: var(--text-dim); border: 1px solid var(--border); font-family: var(--font-display); font-weight: 600; font-size: 13px; padding: 11px 20px; cursor: pointer; transition: all .15s; }
+  .btn-secondary:hover { border-color: var(--text-dim); color: var(--text); }
+
+  .phase-indicator { display: flex; gap: 8px; align-items: center; }
+  .phase-dot { width: 8px; height: 8px; background: var(--surface3); border: 1px solid var(--border); border-radius: 50%; transition: background .3s; }
+  .phase-dot.done { background: var(--amber); border-color: var(--amber); }
+
+  .session-count-display { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
+  .session-count-display span { color: var(--amber); }
+
+  .duration-toggles { display: flex; gap: 6px; }
+  .dur-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim); font-family: var(--font-mono); font-size: 11px; padding: 5px 10px; cursor: pointer; transition: all .15s; }
+  .dur-btn.active { border-color: var(--amber); color: var(--amber); background: var(--amber-glow); }
+
+  /* PROGRESS */
+  .progress-section { flex: 1; padding: 36px 48px; overflow-y: auto; }
+  .section-title { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 24px; font-family: var(--font-mono); display: flex; align-items: center; gap: 10px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .overview-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 32px; }
+  .ov-card { background: var(--surface); border: 1px solid var(--border); padding: 18px; position: relative; overflow: hidden; }
+  .ov-card::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: var(--amber); transform: scaleX(0); transform-origin: left; transition: transform .4s ease; }
+  .ov-card:hover::after { transform: scaleX(1); }
+  .ov-card-val { font-family: var(--font-mono); font-size: 28px; font-weight: 700; color: var(--amber); line-height: 1; }
+  .ov-card-lbl { font-size: 11px; color: var(--text-dim); margin-top: 6px; letter-spacing: 0.5px; }
+  .ov-card-sub { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); margin-top: 8px; }
+  .ov-card-sub span { color: var(--green); }
+
+  .overall-progress { margin-bottom: 32px; }
+  .progress-bar-wrap { height: 6px; background: var(--surface3); position: relative; overflow: hidden; margin-top: 10px; }
+  .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--amber), #fbbf24); transition: width .6s cubic-bezier(.22,1,.36,1); position: relative; }
+  .progress-bar-fill::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 20px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3)); animation: shimmer 1.5s infinite; }
+  @keyframes shimmer { 0%{opacity:0} 50%{opacity:1} 100%{opacity:0} }
+  .progress-label-row { display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px; }
+  .progress-label { font-size: 12px; color: var(--text-dim); }
+  .progress-pct { font-family: var(--font-mono); font-size: 13px; color: var(--amber); font-weight: 700; }
+
+  .task-breakdown { margin-bottom: 32px; }
+  .breakdown-row { display: grid; grid-template-columns: 200px 1fr 80px 60px; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .breakdown-row:first-child { border-top: 1px solid var(--border); }
+  .breakdown-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .breakdown-name.done { text-decoration: line-through; color: var(--text-dim); }
+  .mini-bar-wrap { height: 4px; background: var(--surface3); position: relative; overflow: hidden; }
+  .mini-bar-fill { height: 100%; background: var(--amber); transition: width .5s ease; }
+  .mini-bar-fill.done { background: var(--green); }
+  .breakdown-sessions { font-family: var(--font-mono); font-size: 10px; color: var(--amber); text-align: right; }
+  .breakdown-pct { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); text-align: right; }
+
+  .log-entry { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); animation: fadeIn .3s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+  .log-dot { width: 8px; height: 8px; background: var(--amber); border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+  .log-dot.break { background: var(--green); }
+  .log-text { font-size: 12px; color: var(--text-dim); flex: 1; }
+  .log-text strong { color: var(--text); font-weight: 600; }
+  .log-time { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); flex-shrink: 0; }
+
+  .notif { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--amber); padding: 14px 20px; font-size: 13px; color: var(--text); z-index: 999; opacity: 0; transform: translateY(10px); transition: opacity .3s, transform .3s; pointer-events: none; max-width: 280px; font-family: var(--font-mono); }
+  .notif.show { opacity: 1; transform: none; }
+  .notif.green { border-color: var(--green); }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { height: auto; position: static; }
+    .overview-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">⬡ FocusFlow</div>
+      <div class="logo-sub">Local · No login required</div>
+    </div>
+
+    <div class="stats-strip">
+      <div class="stat-cell"><div class="stat-val" id="stat-total">0</div><div class="stat-lbl">Tasks</div></div>
+      <div class="stat-cell"><div class="stat-val" id="stat-done">0</div><div class="stat-lbl">Done</div></div>
+      <div class="stat-cell"><div class="stat-val" id="stat-sessions">0</div><div class="stat-lbl">Sessions</div></div>
+    </div>
+
+    <div class="add-task-zone">
+      <div class="add-task-row">
+        <input class="task-input" id="newTaskInput" placeholder="Add a new task..." maxlength="80">
+        <button class="btn-add" onclick="addTask()">+ ADD</button>
+      </div>
+    </div>
+
+    <div class="task-list" id="taskList"></div>
+  </aside>
+
+  <main class="main">
+    <div class="timer-section">
+      <div class="active-task-label">// ACTIVE TASK</div>
+      <div class="active-task-name" id="activeTaskName">
+        <span class="placeholder">Select a task to begin focus session</span>
+      </div>
+
+      <div class="timer-ring-area">
+        <div class="timer-ring-wrap">
+          <svg class="ring-svg" viewBox="0 0 180 180">
+            <circle class="ring-bg" cx="90" cy="90" r="80"/>
+            <circle class="ring-progress" id="ringProgress" cx="90" cy="90" r="80"/>
+          </svg>
+          <div class="timer-display">
+            <div class="timer-time" id="timerDisplay">25:00</div>
+            <div class="timer-mode" id="timerMode">FOCUS</div>
+          </div>
+        </div>
+
+        <div class="timer-controls">
+          <div class="duration-toggles">
+            <button class="dur-btn active" onclick="setDuration(25)" id="dur25">25 MIN</button>
+            <button class="dur-btn" onclick="setDuration(50)" id="dur50">50 MIN</button>
+            <button class="dur-btn" onclick="setDuration(90)" id="dur90">90 MIN</button>
+          </div>
+          <div class="timer-btn-row">
+            <button class="btn-primary" id="btnStart" onclick="toggleTimer()">▶ START</button>
+            <button class="btn-secondary" onclick="resetTimer()">↺ RESET</button>
+          </div>
+          <div class="phase-indicator" id="phaseIndicator"></div>
+          <div class="session-count-display" id="sessionCountDisplay">Sessions today: <span>0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="progress-section">
+      <div class="section-title">PROGRESS OVERVIEW</div>
+      <div class="overview-grid">
+        <div class="ov-card"><div class="ov-card-val" id="ov-total">0</div><div class="ov-card-lbl">Total Tasks</div><div class="ov-card-sub" id="ov-subtasks">— subtasks</div></div>
+        <div class="ov-card"><div class="ov-card-val" id="ov-completed">0</div><div class="ov-card-lbl">Completed</div><div class="ov-card-sub" id="ov-comp-sub"><span>0%</span> completion rate</div></div>
+        <div class="ov-card"><div class="ov-card-val" id="ov-sessions">0</div><div class="ov-card-lbl">Focus Sessions</div><div class="ov-card-sub" id="ov-minutes">— focus minutes</div></div>
+        <div class="ov-card"><div class="ov-card-val" id="ov-streak">0</div><div class="ov-card-lbl">Session Streak</div><div class="ov-card-sub">best today</div></div>
+      </div>
+
+      <div class="overall-progress">
+        <div class="section-title">OVERALL COMPLETION</div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" id="overallBar" style="width:0%"></div></div>
+        <div class="progress-label-row">
+          <span class="progress-label" id="progressLabelL">0 of 0 tasks complete</span>
+          <span class="progress-pct" id="progressPct">0%</span>
+        </div>
+      </div>
+
+      <div class="task-breakdown">
+        <div class="section-title">TASK BREAKDOWN</div>
+        <div id="breakdownList"><div style="color:var(--text-dim);font-size:12px;padding:16px 0;font-family:var(--font-mono)">No tasks yet. Add some tasks to see the breakdown.</div></div>
+      </div>
+
+      <div>
+        <div class="section-title">SESSION LOG</div>
+        <div id="sessionLog"><div style="color:var(--text-dim);font-size:12px;padding:16px 0;font-family:var(--font-mono)">Session history will appear here.</div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="notif" id="notif"></div>
+
+<script>
+  // ── STATE ─────────────────────────────────────────────────
+  let tasks      = JSON.parse(localStorage.getItem('ff_tasks') || '[]');
+  let sessionLog = JSON.parse(localStorage.getItem('ff_log')   || '[]');
+  let activeTaskId = null;
+  let timerRunning = false, timerInterval = null;
+  let focusDuration = 25, breakDuration = 5;
+  let secondsLeft = 1500, totalSeconds = 1500;
+  let isBreak = false, completedPomos = 0, sessionStreak = 0, totalSessions = 0;
+
+  // ── UTILS ─────────────────────────────────────────────────
+  function uid()  { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+  function fmt(n) { return n < 10 ? '0'+n : ''+n; }
+  function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function nowStr() { const d=new Date(); return fmt(d.getHours())+':'+fmt(d.getMinutes()); }
+
+  function save() {
+    localStorage.setItem('ff_tasks', JSON.stringify(tasks));
+    localStorage.setItem('ff_log',   JSON.stringify(sessionLog.slice(-50)));
+  }
+
+  function notify(msg, green=false) {
+    const el = document.getElementById('notif');
+    el.textContent = msg;
+    el.className = 'notif show'+(green?' green':'');
+    clearTimeout(el._t);
+    el._t = setTimeout(()=>el.className='notif', 3200);
+  }
+
+  // ── TASK OPS ─────────────────────────────────────────────
+  function addTask() {
+    const inp = document.getElementById('newTaskInput');
+    const name = inp.value.trim();
+    if (!name) return;
+    tasks.push({ id:uid(), name, done:false, sessions:0, subtasks:[] });
+    inp.value = '';
+    save(); renderAll();
+    notify('Task added: '+name);
+  }
+  document.getElementById('newTaskInput').addEventListener('keydown', e=>{ if(e.key==='Enter') addTask(); });
+
+  function toggleDone(id) {
+    const t = tasks.find(t=>t.id===id); if (!t) return;
+    t.done = !t.done; save(); renderAll();
+  }
+
+  function selectTask(id) {
+    if (timerRunning) { notify('Stop the current session first.'); return; }
+    activeTaskId = id; renderAll(); updateActiveTaskUI();
+  }
+
+  function toggleSubtask(tid, sid) {
+    const t = tasks.find(t=>t.id===tid); if (!t) return;
+    const s = t.subtasks.find(s=>s.id===sid); if (!s) return;
+    s.done = !s.done; save(); renderAll();
+  }
+
+  function addSubtaskUI(tid) {
+    const inp = document.getElementById('subInput-'+tid); if (!inp) return;
+    const name = inp.value.trim(); if (!name) return;
+    const t = tasks.find(t=>t.id===tid); if (!t) return;
+    t.subtasks.push({ id:uid(), name, done:false });
+    inp.value = ''; save(); renderAll();
+  }
+
+  function quickStart(id) { selectTask(id); if (!timerRunning) startTimer(); }
+  function toggleSubtasks(id) { const el=document.getElementById('sub-'+id); if(el) el.classList.toggle('open'); }
+
+  // ── RENDER ────────────────────────────────────────────────
+  function renderAll() { renderTaskList(); renderStats(); renderBreakdown(); renderSessionLog(); }
+
+  function renderTaskList() {
+    const c = document.getElementById('taskList');
+    if (!tasks.length) {
+      c.innerHTML = `<div style="color:var(--text-dim);font-family:var(--font-mono);font-size:12px;padding:16px 8px;text-align:center">No tasks yet.<br>Add one above to begin.</div>`;
+      return;
+    }
+    c.innerHTML = tasks.map(t => {
+      const subDone  = t.subtasks.filter(s=>s.done).length;
+      const subTotal = t.subtasks.length;
+      const subBadge = subTotal ? `<span style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim)">${subDone}/${subTotal}</span>` : '';
+      const subRows  = t.subtasks.map(s=>`
+        <div class="subtask-row">
+          <div class="task-check ${s.done?'checked':''}" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"></div>
+          <span class="subtask-name ${s.done?'done':''}">${esc(s.name)}</span>
+        </div>`).join('');
+      return `
+      <div class="task-item ${t.done?'done':''} ${t.id===activeTaskId?'active':''}">
+        <div class="task-header" onclick="selectTask('${t.id}')">
+          <div class="task-check ${t.done?'checked':''}" onclick="event.stopPropagation();toggleDone('${t.id}')"></div>
+          <span class="task-name">${esc(t.name)}</span>
+          <div class="task-meta">
+            ${subBadge}
+            ${t.sessions>0?`<span class="sessions-badge">🍅 ${t.sessions}</span>`:''}
+            <button class="btn-focus-mini" onclick="event.stopPropagation();quickStart('${t.id}')">▶</button>
+            <button class="expand-btn" onclick="event.stopPropagation();toggleSubtasks('${t.id}')">⊞</button>
+          </div>
+        </div>
+        <div class="subtask-list" id="sub-${t.id}">
+          ${subRows}
+          <div class="add-subtask-row">
+            <input class="subtask-input" id="subInput-${t.id}" placeholder="Add subtask..."
+              onkeydown="if(event.key==='Enter'){addSubtaskUI('${t.id}');}" onclick="event.stopPropagation()">
+            <button class="btn-subtask-add" onclick="event.stopPropagation();addSubtaskUI('${t.id}')">+</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function updateActiveTaskUI() {
+    const t = tasks.find(t=>t.id===activeTaskId);
+    document.getElementById('activeTaskName').innerHTML = t
+      ? esc(t.name)
+      : '<span class="placeholder">Select a task to begin focus session</span>';
+  }
+
+  function renderStats() {
+    const total    = tasks.length;
+    const done     = tasks.filter(t=>t.done).length;
+    const sessions = tasks.reduce((s,t)=>s+t.sessions, 0);
+    document.getElementById('stat-total').textContent    = total;
+    document.getElementById('stat-done').textContent     = done;
+    document.getElementById('stat-sessions').textContent = sessions;
+    document.getElementById('ov-total').textContent      = total;
+    const subs = tasks.reduce((s,t)=>s+t.subtasks.length, 0);
+    document.getElementById('ov-subtasks').textContent   = subs+' subtask'+(subs!==1?'s':'');
+    document.getElementById('ov-completed').textContent  = done;
+    const pct = total ? Math.round((done/total)*100) : 0;
+    document.getElementById('ov-comp-sub').innerHTML     = `<span>${pct}%</span> completion rate`;
+    document.getElementById('ov-sessions').textContent   = sessions;
+    document.getElementById('ov-minutes').textContent    = (sessions*focusDuration)+' focus minutes';
+    document.getElementById('ov-streak').textContent     = sessionStreak;
+    document.getElementById('overallBar').style.width    = pct+'%';
+    document.getElementById('progressLabelL').textContent= done+' of '+total+' tasks complete';
+    document.getElementById('progressPct').textContent   = pct+'%';
+    document.getElementById('sessionCountDisplay').innerHTML = `Sessions today: <span>${totalSessions}</span>`;
+  }
+
+  function renderBreakdown() {
+    const c = document.getElementById('breakdownList');
+    if (!tasks.length) { c.innerHTML=`<div style="color:var(--text-dim);font-size:12px;padding:16px 0;font-family:var(--font-mono)">No tasks yet.</div>`; return; }
+    const max = Math.max(1,...tasks.map(t=>t.sessions));
+    c.innerHTML = tasks.map(t=>`
+      <div class="breakdown-row">
+        <div class="breakdown-name ${t.done?'done':''}">${esc(t.name)}</div>
+        <div class="mini-bar-wrap"><div class="mini-bar-fill ${t.done?'done':''}" style="width:${Math.round(t.sessions/max*100)}%"></div></div>
+        <div class="breakdown-sessions">${t.sessions>0?`🍅 ${t.sessions} (${t.sessions*focusDuration}m)`:'—'}</div>
+        <div class="breakdown-pct">${t.done?'✓ done':t.sessions>0?'active':'pending'}</div>
+      </div>`).join('');
+  }
+
+  function renderSessionLog() {
+    const c = document.getElementById('sessionLog');
+    if (!sessionLog.length) { c.innerHTML=`<div style="color:var(--text-dim);font-size:12px;padding:16px 0;font-family:var(--font-mono)">Session history will appear here.</div>`; return; }
+    c.innerHTML = [...sessionLog].reverse().slice(0,20).map(e=>`
+      <div class="log-entry">
+        <div class="log-dot ${e.type==='break'?'break':''}"></div>
+        <div class="log-text">${e.msg}</div>
+        <div class="log-time">${e.time}</div>
+      </div>`).join('');
+  }
+
+  function addLog(msg, type='focus') {
+    sessionLog.push({ msg, type, time:nowStr() });
+    save(); renderSessionLog();
+  }
+
+  // ── TIMER ─────────────────────────────────────────────────
+  function setDuration(mins) {
+    if (timerRunning) return;
+    focusDuration = mins; secondsLeft = mins*60; totalSeconds = mins*60;
+    updateTimerDisplay(); updateRing();
+    document.querySelectorAll('.dur-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('dur'+mins).classList.add('active');
+  }
+
+  function toggleTimer() {
+    if (!activeTaskId && !timerRunning) { notify('Please select a task first.'); return; }
+    timerRunning ? pauseTimer() : startTimer();
+  }
+
+  function startTimer() {
+    timerRunning = true;
+    document.getElementById('btnStart').textContent = '⏸ PAUSE';
+    timerInterval = setInterval(tick, 1000);
+    const t = tasks.find(t=>t.id===activeTaskId);
+    if (!isBreak && t) addLog(`Started focus on <strong>${esc(t.name)}</strong>`, 'focus');
+  }
+
+  function pauseTimer() {
+    timerRunning = false; clearInterval(timerInterval);
+    document.getElementById('btnStart').textContent = '▶ RESUME';
+    addLog('Session paused', 'pause');
+  }
+
+  function resetTimer() {
+    timerRunning = false; clearInterval(timerInterval);
+    isBreak = false; secondsLeft = focusDuration*60; totalSeconds = focusDuration*60;
+    document.getElementById('btnStart').textContent  = '▶ START';
+    document.getElementById('timerMode').textContent = 'FOCUS';
+    updateTimerDisplay(); updateRing();
+  }
+
+  function tick() {
+    secondsLeft--; updateTimerDisplay(); updateRing();
+    if (secondsLeft > 0) return;
+    clearInterval(timerInterval); timerRunning = false;
+
+    if (!isBreak) {
+      completedPomos++; totalSessions++; sessionStreak++;
+      const t = tasks.find(t=>t.id===activeTaskId);
+      if (t) {
+        t.sessions++;
+        save();
+        addLog(`✓ Completed ${focusDuration}min session on <strong>${esc(t.name)}</strong>`, 'focus');
+        notify(`🍅 Session done! +1 on "${t.name}"`, true);
+        renderAll();
+      }
+      isBreak = true;
+      const isLong = completedPomos%4===0;
+      breakDuration = isLong ? 15 : 5;
+      secondsLeft = breakDuration*60; totalSeconds = breakDuration*60;
+      document.getElementById('timerMode').textContent = isLong ? 'LONG BREAK' : 'SHORT BREAK';
+      updateTimerDisplay(); updateRing(true);
+      timerRunning = true;
+      document.getElementById('btnStart').textContent = '⏸ PAUSE';
+      timerInterval = setInterval(tick, 1000);
+      addLog(`Break started (${breakDuration}min)`, 'break');
+    } else {
+      isBreak = false; secondsLeft = focusDuration*60; totalSeconds = focusDuration*60;
+      document.getElementById('timerMode').textContent = 'FOCUS';
+      document.getElementById('btnStart').textContent  = '▶ START';
+      updateTimerDisplay(); updateRing();
+      notify('Break over! Ready for next session.');
+      addLog('Break ended — ready for next session', 'break');
+    }
+    updatePhaseDots();
+  }
+
+  function updateTimerDisplay() {
+    const el = document.getElementById('timerDisplay');
+    el.textContent = fmt(Math.floor(secondsLeft/60))+':'+fmt(secondsLeft%60);
+    el.className = 'timer-time'+(isBreak?' break':'');
+  }
+  function updateRing(brk=false) {
+    const r = document.getElementById('ringProgress');
+    r.style.strokeDashoffset = (2*Math.PI*80)*(1-secondsLeft/totalSeconds);
+    r.className = 'ring-progress'+((isBreak||brk)?' break':'');
+  }
+  function updatePhaseDots() {
+    const c = document.getElementById('phaseIndicator'); c.innerHTML='';
+    for(let i=0;i<4;i++){const d=document.createElement('div');d.className='phase-dot'+(i<completedPomos%4?' done':'');c.appendChild(d);}
+  }
+
+  // ── INIT ──────────────────────────────────────────────────
+  updatePhaseDots(); renderAll(); updateTimerDisplay(); updateRing();
+</script>
+</body>
+</html>
