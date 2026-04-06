@@ -217,7 +217,7 @@
     <span id="userEmail"></span>
     <span class="sync-dot synced" id="syncDot" title="Synced to cloud"></span>
   </div>
-  <button class="btn-signout" id="signOutBtn">SIGN OUT</button>
+  <button class="btn-signout" id="signOutBtn" onclick="doSignOut()">SIGN OUT</button>
 </div>
 
 <div class="app" id="appMain">
@@ -318,12 +318,12 @@ import { getFirestore, doc, collection, onSnapshot, setDoc, deleteDoc,
 // │  Your apps → </> Web → firebaseConfig                        │
 // └──────────────────────────────────────────────────────────────┘
 const firebaseConfig = {
-  apiKey:            "AIzaSyA4e1bJQqUw6aPMoYx4kFCjwBWrNwOch0M",
-  authDomain:        "focusflow-a5d7d.firebaseapp.com",
-  projectId:         "focusflow-a5d7d",
-  storageBucket:     "focusflow-a5d7d.firebasestorage.app",
+  apiKey: "AIzaSyA4e1bJQqUw6aPMoYx4kFCjwBWrNwOch0M",
+  authDomain: "focusflow-a5d7d.firebaseapp.com",
+  projectId: "focusflow-a5d7d",
+  storageBucket: "focusflow-a5d7d.firebasestorage.app",
   messagingSenderId: "650900288766",
-  appId:             "1:650900288766:web:29cc9ba86cee8d5f5ca1af"
+  appId: "1:650900288766:web:29cc9ba86cee8d5f5ca1af"
 };
 // ──────────────────────────────────────────────────────────────
 
@@ -380,11 +380,14 @@ window.signInEmail = async () => {
 };
 
 window.doSignOut = async () => {
-  resetTimer();
-  if (unsubTasks) unsubTasks();
-  if (unsubLog)   unsubLog();
-  tasks = []; sessionLog = [];
-  await fbSignOut(auth);
+  try {
+    timerRunning = false;
+    clearInterval(timerInterval);
+    if (unsubTasks) unsubTasks();
+    if (unsubLog)   unsubLog();
+    tasks = []; sessionLog = [];
+    await fbSignOut(auth);
+  } catch(e) { console.error('Sign out error:', e); }
 };
 
 onAuthStateChanged(auth, user => {
@@ -654,7 +657,12 @@ function updatePhaseDots() {
 
 // Init
 updatePhaseDots(); updateTimerDisplay(); updateRing();
-document.getElementById('signOutBtn').addEventListener('click', doSignOut);
+
+// Wire up sign out button directly (avoids onclick + module scope issues)
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('signOutBtn');
+  if (btn) btn.addEventListener('click', window.doSignOut);
+});
 </script>
 </body>
 </html>
